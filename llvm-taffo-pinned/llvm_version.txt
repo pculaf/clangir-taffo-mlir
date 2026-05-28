@@ -1,0 +1,6 @@
+repository: https://github.com/llvm/llvm-project
+commit: 1f5b6ae89fbc88d22c323fa56d8bdad9f7b695c3
+version: 21.0.0git
+build_type: Debug
+assertions: ON
+clangir_cir: CLANG_ENABLE_CIR=ON

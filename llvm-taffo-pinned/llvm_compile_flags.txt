@@ -1,0 +1,19 @@
+cmake -S <llvm-project>/llvm \
+  -B <build-dir> \
+  -G Ninja \
+  -DCMAKE_INSTALL_PREFIX=<install-prefix> \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DLLVM_ENABLE_PROJECTS='clang;mlir;compiler-rt' \
+  -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
+  -DLLVM_ENABLE_LIBCXX=ON \
+  -DCLANG_ENABLE_CIR=ON \
+  -DLLVM_INSTALL_UTILS=ON \
+  -DLLVM_INCLUDE_EXAMPLES=OFF \
+  -DLLVM_BUILD_LLVM_DYLIB=ON \
+  -DLLVM_LINK_LLVM_DYLIB=ON \
+  -DLLVM_OPTIMIZED_TABLEGEN=ON \
+  -DLLVM_USE_LINKER=gold \
+  -DLLVM_PARALLEL_LINK_JOBS=1 \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++
