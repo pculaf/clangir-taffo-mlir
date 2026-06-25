@@ -14,8 +14,13 @@ with ClangIR/CIR support enabled. A separate top-of-tree LLVM build was also
 used to check the current upstream ClangIR state.
 
 At the current checked LLVM revisions, ClangIR can emit CIR and lower CIR to
-LLVM-level representations. A direct path from CIR to high-level MLIR dialects
-does not appear to be exposed by the tested tools.
+LLVM-level representations. Lowering CIR to high-level MLIR dialects such as
+`func`, `arith`, `scf`, `cf`, and `memref` does not appear to be available as an
+exposed tool path in the tested tools.
+
+The incubator `llvm/clangir` repository appears to contain through-MLIR lowering
+infrastructure, but that path does not appear to be available in the official
+top-of-tree LLVM build checked here.
 
 The currently exposed ClangIR path is:
 
@@ -25,28 +30,14 @@ CIR -> LLVM dialect MLIR
 CIR -> LLVM IR
 ```
 
-## Current Conclusion
-
-In the currently tested toolchains, lowering CIR to high-level MLIR dialects
-such as `func`, `arith`, `scf`, `cf`, and `memref` does not appear to be
-available as an exposed tool path.
-
-The incubator `llvm/clangir` repository appears to contain through-MLIR lowering
-infrastructure. In the official top-of-tree LLVM build checked here, that path
-does not appear to be available in the tested tools.
-
 ## Next Steps
 
 The next implementation step is to define an initial CIR subset and lower it to
 standard MLIR dialects, starting with arithmetic operations.
 
-Planned work:
-
-- define the first supported CIR subset
-- generate representative CIR inputs with ClangIR
-- implement an initial CIR-to-standard-MLIR lowering experiment
-- validate the produced MLIR with MLIR and TAFFO-MLIR tools
-- document supported operations and current limitations
+This will involve generating representative CIR inputs with ClangIR,
+implementing an initial lowering experiment, and checking whether the produced
+MLIR can be used with the existing TAFFO-MLIR pipeline.
 
 ## Build References
 
