@@ -71,19 +71,29 @@ struct ConvertFuncOp : public mlir::OpConversionPattern<cir::FuncOp> {
   }
 };
 
-struct ConvertAddOp : public mlir::OpConversionPattern<cir::BinOp> {
+struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(cir::BinOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (op.getKind() != cir::BinOpKind::Add)
-      return rewriter.notifyMatchFailure(op, "only addition is supported");
     if (!mlir::isa<cir::SingleType>(op.getLhs().getType()))
       return rewriter.notifyMatchFailure(op, "only !cir.float is supported");
 
-    rewriter.replaceOpWithNewOp<mlir::arith::AddFOp>(op, adaptor.getLhs(),
-                                                     adaptor.getRhs());
+    switch (op.getKind()) {
+    case cir::BinOpKind::Add:
+      rewriter.replaceOpWithNewOp<mlir::arith::AddFOp>(op, adaptor.getLhs(),
+                                                       adaptor.getRhs());
+      break;
+    case cir::BinOpKind::Mul:
+      rewriter.replaceOpWithNewOp<mlir::arith::MulFOp>(op, adaptor.getLhs(),
+                                                       adaptor.getRhs());
+      break;
+    default:
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported binary operation kind");
+    }
+
     return mlir::success();
   }
 };
@@ -115,7 +125,7 @@ public:
     target.addIllegalDialect<cir::CIRDialect>();
 
     mlir::RewritePatternSet patterns(context);
-    patterns.add<ConvertFuncOp, ConvertAddOp, ConvertReturnOp>(typeConverter,
+    patterns.add<ConvertFuncOp, ConvertBinOp, ConvertReturnOp>(typeConverter,
                                                                context);
 
     if (mlir::failed(mlir::applyFullConversion(getOperation(), target,

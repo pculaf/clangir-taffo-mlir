@@ -5,7 +5,7 @@ from lit.llvm import llvm_config
 
 config.name = "CLANGIR_TAFFO"
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
-config.suffixes = [".mlir"]
+config.suffixes = [".c", ".mlir"]
 config.test_source_root = os.path.dirname(__file__)
 config.test_exec_root = os.path.join(config.clangir_taffo_obj_root, "test")
 
@@ -18,4 +18,6 @@ config.excludes = [
 ]
 
 tool_dirs = [config.clangir_taffo_tools_dir, config.llvm_tools_dir]
-llvm_config.add_tool_substitutions(["clangir-taffo-opt"], tool_dirs)
+llvm_config.add_tool_substitutions(
+    ["cir-opt", "clang", "clangir-taffo-opt"], tool_dirs
+)
