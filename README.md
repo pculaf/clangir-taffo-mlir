@@ -37,19 +37,28 @@ conversion infrastructure. The currently supported conversion is:
 !cir.float       -> f32
 cir.func         -> func.func
 cir.binop(add)   -> arith.addf
+cir.binop(mul)   -> arith.mulf
 cir.return       -> func.return
 ```
 
-The initial pass converts a complete floating-point addition function without
-leaving CIR operations in the output. Unsupported CIR operations cause the
-conversion to fail. The tool setup and addition conversion are covered by
-`lit` and `FileCheck` regression tests.
+The initial pass converts complete floating-point addition and multiplication
+functions without leaving CIR operations in the output. Unsupported CIR
+operations cause the conversion to fail. The tool setup and conversions are
+covered by `lit` and `FileCheck` regression tests. Both arithmetic paths have
+also been validated from C source through Clang CIR generation and `mem2reg`.
+
+A range-annotated `arith.addf` function has also been validated through TAFFO
+raising, value-range analysis, datatype optimization, and lowering back to
+`arith`. This required a correction to TAFFO-MLIR's function-return conversion,
+which is documented in
+[`docs/development/taffo-return-conversion.md`](docs/development/taffo-return-conversion.md).
+The current CIR conversion does not yet preserve the range input needed to run
+this complete path directly from C.
 
 ## Next Steps
 
-The next step is to validate the initial conversion with CIR emitted by Clang,
-then extend the supported arithmetic subset and test the resulting standard
-MLIR with the TAFFO-MLIR pipeline.
+The next step is to extend the supported CIR subset to preserve range input and
+validate the complete path from C through the TAFFO-MLIR pipeline.
 
 ## Building
 
