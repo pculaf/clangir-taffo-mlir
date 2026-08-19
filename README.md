@@ -37,15 +37,18 @@ conversion infrastructure. The currently supported conversion is:
 !cir.float       -> f32
 cir.func         -> func.func
 cir.binop(add)   -> arith.addf
+cir.binop(sub)   -> arith.subf
 cir.binop(mul)   -> arith.mulf
+cir.binop(div)   -> arith.divf
 cir.return       -> func.return
 ```
 
-The initial pass converts complete floating-point addition and multiplication
-functions without leaving CIR operations in the output. Unsupported CIR
-operations cause the conversion to fail. The tool setup and conversions are
-covered by `lit` and `FileCheck` regression tests. Both arithmetic paths have
-also been validated from C source through Clang CIR generation and `mem2reg`.
+The initial pass converts complete floating-point functions using addition,
+subtraction, multiplication, and division without leaving CIR operations in
+the output. Unsupported CIR operations cause the conversion to fail. The tool
+setup and conversions are covered by `lit` and `FileCheck` regression tests.
+All four arithmetic paths have also been validated from C source through Clang
+CIR generation and `mem2reg`.
 
 A range-annotated `arith.addf` function has also been validated through TAFFO
 raising, value-range analysis, datatype optimization, and lowering back to

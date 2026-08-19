@@ -85,8 +85,16 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
       rewriter.replaceOpWithNewOp<mlir::arith::AddFOp>(op, adaptor.getLhs(),
                                                        adaptor.getRhs());
       break;
+    case cir::BinOpKind::Sub:
+      rewriter.replaceOpWithNewOp<mlir::arith::SubFOp>(op, adaptor.getLhs(),
+                                                       adaptor.getRhs());
+      break;
     case cir::BinOpKind::Mul:
       rewriter.replaceOpWithNewOp<mlir::arith::MulFOp>(op, adaptor.getLhs(),
+                                                       adaptor.getRhs());
+      break;
+    case cir::BinOpKind::Div:
+      rewriter.replaceOpWithNewOp<mlir::arith::DivFOp>(op, adaptor.getLhs(),
                                                        adaptor.getRhs());
       break;
     default:
