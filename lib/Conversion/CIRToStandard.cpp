@@ -24,8 +24,15 @@ public:
     addConversion([context](cir::SingleType) -> mlir::Type {
       return mlir::Float32Type::get(context);
     });
+    addConversion([context](cir::DoubleType) -> mlir::Type {
+      return mlir::Float64Type::get(context);
+    });
   }
 };
+
+static bool isSupportedCIRFloatType(mlir::Type type) {
+  return mlir::isa<cir::SingleType, cir::DoubleType>(type);
+}
 
 struct ConvertFuncOp : public mlir::OpConversionPattern<cir::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -56,8 +63,10 @@ struct ConvertFuncOp : public mlir::OpConversionPattern<cir::FuncOp> {
     auto newFunc = rewriter.create<mlir::func::FuncOp>(
         op.getLoc(), op.getSymName(), functionType);
 
-    if (mlir::Attribute visibility =
-            op->getAttr(mlir::SymbolTable::getVisibilityAttrName()))
+    if (op.getBody().empty())
+      newFunc.setPrivate();
+    else if (mlir::Attribute visibility =
+                 op->getAttr(mlir::SymbolTable::getVisibilityAttrName()))
       newFunc->setAttr(mlir::SymbolTable::getVisibilityAttrName(), visibility);
 
     rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(),
@@ -106,6 +115,75 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
   }
 };
 
+struct ConvertConstantOp : public mlir::OpConversionPattern<cir::ConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::ConstantOp op, OpAdaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto value = mlir::dyn_cast<cir::FPAttr>(op.getValue());
+    if (!value)
+      return rewriter.notifyMatchFailure(
+          op, "only floating constants are supported");
+
+    mlir::Type convertedType = getTypeConverter()->convertType(op.getType());
+    auto floatType = mlir::dyn_cast_or_null<mlir::FloatType>(convertedType);
+    if (!floatType)
+      return rewriter.notifyMatchFailure(op, "constant type is unsupported");
+
+    auto convertedValue = mlir::FloatAttr::get(floatType, value.getValue());
+    rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, convertedValue);
+    return mlir::success();
+  }
+};
+
+struct ConvertUnaryOp : public mlir::OpConversionPattern<cir::UnaryOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::UnaryOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!isSupportedCIRFloatType(op.getType()))
+      return rewriter.notifyMatchFailure(
+          op, "only floating unary operations are supported");
+    if (op.getKind() != cir::UnaryOpKind::Minus)
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported unary operation kind");
+
+    rewriter.replaceOpWithNewOp<mlir::arith::NegFOp>(op, adaptor.getInput());
+    return mlir::success();
+  }
+};
+
+struct ConvertCallOp : public mlir::OpConversionPattern<cir::CallOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::CallOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (op.isIndirect())
+      return rewriter.notifyMatchFailure(op, "indirect calls are unsupported");
+
+    for (mlir::Type type : op.getOperandTypes())
+      if (!isSupportedCIRFloatType(type))
+        return rewriter.notifyMatchFailure(op,
+                                           "call operand type is unsupported");
+    for (mlir::Type type : op.getResultTypes())
+      if (!isSupportedCIRFloatType(type))
+        return rewriter.notifyMatchFailure(op,
+                                           "call result type is unsupported");
+
+    llvm::SmallVector<mlir::Type> resultTypes;
+    if (mlir::failed(
+            getTypeConverter()->convertTypes(op.getResultTypes(), resultTypes)))
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
+        op, op.getCalleeAttr(), resultTypes, adaptor.getArgs());
+    return mlir::success();
+  }
+};
+
 struct ConvertReturnOp : public mlir::OpConversionPattern<cir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -133,8 +211,8 @@ public:
     target.addIllegalDialect<cir::CIRDialect>();
 
     mlir::RewritePatternSet patterns(context);
-    patterns.add<ConvertFuncOp, ConvertBinOp, ConvertReturnOp>(typeConverter,
-                                                               context);
+    patterns.add<ConvertFuncOp, ConvertBinOp, ConvertConstantOp, ConvertUnaryOp,
+                 ConvertCallOp, ConvertReturnOp>(typeConverter, context);
 
     if (mlir::failed(mlir::applyFullConversion(getOperation(), target,
                                                std::move(patterns))))

@@ -19,5 +19,5 @@ config.excludes = [
 
 tool_dirs = [config.clangir_taffo_tools_dir, config.llvm_tools_dir]
 llvm_config.add_tool_substitutions(
-    ["cir-opt", "clang", "clangir-taffo-opt"], tool_dirs
+    ["cir-opt", "clang", "clangir-taffo-opt", "mlir-opt", "not"], tool_dirs
 )
