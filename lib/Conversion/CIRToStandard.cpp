@@ -192,13 +192,10 @@ struct ConvertBranchOp : public mlir::OpConversionPattern<cir::BrOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(cir::BrOp op, OpAdaptor,
+  matchAndRewrite(cir::BrOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!op.getDestOperands().empty())
-      return rewriter.notifyMatchFailure(
-          op, "branches with successor operands are unsupported");
-
-    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest());
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
+                                                    adaptor.getDestOperands());
     return mlir::success();
   }
 };
@@ -209,13 +206,9 @@ struct ConvertCondBranchOp : public mlir::OpConversionPattern<cir::BrCondOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::BrCondOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!op.getDestOperandsTrue().empty() || !op.getDestOperandsFalse().empty())
-      return rewriter.notifyMatchFailure(
-          op, "conditional branches with successor operands are unsupported");
-
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-        op, adaptor.getCond(), op.getDestTrue(), mlir::ValueRange{},
-        op.getDestFalse(), mlir::ValueRange{});
+        op, adaptor.getCond(), op.getDestTrue(), adaptor.getDestOperandsTrue(),
+        op.getDestFalse(), adaptor.getDestOperandsFalse());
     return mlir::success();
   }
 };

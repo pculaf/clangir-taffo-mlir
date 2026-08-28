@@ -59,7 +59,10 @@ CIR generation and `mem2reg`. Range-annotated addition, multiplication, and
 division have been validated through CIR conversion, TAFFO-MLIR raising and
 optimization, and lowering back to `arith`. Boolean-controlled branching with
 supported arithmetic in each branch has also been validated through the same
-pipeline.
+pipeline. Branch successor operands and converted block arguments are
+supported, and Clang-generated value merges have been validated through
+conversion and MLIR's `--lift-cf-to-scf` pass. TAFFO-MLIR does not yet process
+the resulting value-producing control flow cleanly.
 
 ## Next Steps
 
