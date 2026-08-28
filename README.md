@@ -36,6 +36,7 @@ conversion infrastructure. The currently supported conversion is:
 ```text
 !cir.float       -> f32
 !cir.double      -> f64
+!cir.bool        -> i1
 cir.func         -> func.func
 cir.const(fp)    -> arith.constant
 cir.unary(minus) -> arith.negf
@@ -44,6 +45,8 @@ cir.binop(add)   -> arith.addf
 cir.binop(sub)   -> arith.subf
 cir.binop(mul)   -> arith.mulf
 cir.binop(div)   -> arith.divf
+cir.br           -> cf.br
+cir.brcond       -> cf.cond_br
 cir.return       -> func.return
 ```
 
@@ -54,7 +57,12 @@ setup and conversions are covered by `lit` and `FileCheck` regression tests.
 All four arithmetic paths have also been validated from C source through Clang
 CIR generation and `mem2reg`. Range-annotated addition, multiplication, and
 division have been validated through CIR conversion, TAFFO-MLIR raising and
-optimization, and lowering back to `arith`.
+optimization, and lowering back to `arith`. Boolean-controlled branching with
+supported arithmetic in each branch has also been validated through the same
+pipeline. Branch successor operands and converted block arguments are
+supported, and Clang-generated value merges have been validated through
+conversion and MLIR's `--lift-cf-to-scf` pass. TAFFO-MLIR does not yet process
+the resulting value-producing control flow cleanly.
 
 ## Next Steps
 

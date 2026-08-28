@@ -1,6 +1,7 @@
 #include "ClangIRTAFFO/Conversion/Passes.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -26,6 +27,9 @@ public:
     });
     addConversion([context](cir::DoubleType) -> mlir::Type {
       return mlir::Float64Type::get(context);
+    });
+    addConversion([context](cir::BoolType) -> mlir::Type {
+      return mlir::IntegerType::get(context, 1);
     });
   }
 };
@@ -184,6 +188,31 @@ struct ConvertCallOp : public mlir::OpConversionPattern<cir::CallOp> {
   }
 };
 
+struct ConvertBranchOp : public mlir::OpConversionPattern<cir::BrOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::BrOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
+                                                    adaptor.getDestOperands());
+    return mlir::success();
+  }
+};
+
+struct ConvertCondBranchOp : public mlir::OpConversionPattern<cir::BrCondOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::BrCondOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
+        op, adaptor.getCond(), op.getDestTrue(), adaptor.getDestOperandsTrue(),
+        op.getDestFalse(), adaptor.getDestOperandsFalse());
+    return mlir::success();
+  }
+};
+
 struct ConvertReturnOp : public mlir::OpConversionPattern<cir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -206,13 +235,15 @@ public:
 
     mlir::ConversionTarget target(*context);
     target.addLegalOp<mlir::ModuleOp>();
-    target
-        .addLegalDialect<mlir::arith::ArithDialect, mlir::func::FuncDialect>();
+    target.addLegalDialect<mlir::arith::ArithDialect,
+                           mlir::cf::ControlFlowDialect,
+                           mlir::func::FuncDialect>();
     target.addIllegalDialect<cir::CIRDialect>();
 
     mlir::RewritePatternSet patterns(context);
     patterns.add<ConvertFuncOp, ConvertBinOp, ConvertConstantOp, ConvertUnaryOp,
-                 ConvertCallOp, ConvertReturnOp>(typeConverter, context);
+                 ConvertCallOp, ConvertBranchOp, ConvertCondBranchOp,
+                 ConvertReturnOp>(typeConverter, context);
 
     if (mlir::failed(mlir::applyFullConversion(getOperation(), target,
                                                std::move(patterns))))

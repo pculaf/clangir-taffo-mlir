@@ -9,6 +9,7 @@ def ConvertCIRToStandardPass
 
   let dependentDialects = [
     "mlir::arith::ArithDialect",
+    "mlir::cf::ControlFlowDialect",
     "mlir::func::FuncDialect"
   ];
 }

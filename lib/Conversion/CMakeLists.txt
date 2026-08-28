@@ -7,6 +7,7 @@ add_mlir_library(ClangIRTAFFOConversion
   LINK_LIBS PUBLIC
   MLIRArithDialect
   MLIRCIR
+  MLIRControlFlowDialect
   MLIRFuncDialect
   MLIRIR
   MLIRPass

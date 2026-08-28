@@ -2,6 +2,7 @@ set(LIBS
   ClangIRTAFFOConversion
   MLIRArithDialect
   MLIRCIR
+  MLIRControlFlowDialect
   MLIRFuncDialect
   MLIRIR
   MLIROptLib
