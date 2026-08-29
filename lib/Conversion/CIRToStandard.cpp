@@ -10,6 +10,8 @@
 #include "clang/CIR/Dialect/IR/CIRDialect.h"
 #include "clang/CIR/Dialect/IR/CIRTypes.h"
 
+#include <optional>
+
 namespace clangir_taffo {
 #define GEN_PASS_DEF_CONVERTCIRTOSTANDARDPASS
 #include "ClangIRTAFFO/Conversion/Passes.h.inc"
@@ -36,6 +38,25 @@ public:
 
 static bool isSupportedCIRFloatType(mlir::Type type) {
   return mlir::isa<cir::SingleType, cir::DoubleType>(type);
+}
+
+static std::optional<mlir::arith::CmpFPredicate>
+convertCIRFloatCmpPredicate(cir::CmpOpKind kind) {
+  switch (kind) {
+  case cir::CmpOpKind::lt:
+    return mlir::arith::CmpFPredicate::OLT;
+  case cir::CmpOpKind::le:
+    return mlir::arith::CmpFPredicate::OLE;
+  case cir::CmpOpKind::gt:
+    return mlir::arith::CmpFPredicate::OGT;
+  case cir::CmpOpKind::ge:
+    return mlir::arith::CmpFPredicate::OGE;
+  case cir::CmpOpKind::eq:
+    return mlir::arith::CmpFPredicate::OEQ;
+  case cir::CmpOpKind::ne:
+    return mlir::arith::CmpFPredicate::UNE;
+  }
+  return std::nullopt;
 }
 
 struct ConvertFuncOp : public mlir::OpConversionPattern<cir::FuncOp> {
@@ -188,6 +209,48 @@ struct ConvertCallOp : public mlir::OpConversionPattern<cir::CallOp> {
   }
 };
 
+struct ConvertCmpOp : public mlir::OpConversionPattern<cir::CmpOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::CmpOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!isSupportedCIRFloatType(op.getLhs().getType()))
+      return rewriter.notifyMatchFailure(
+          op, "only floating comparisons are supported");
+
+    std::optional<mlir::arith::CmpFPredicate> predicate =
+        convertCIRFloatCmpPredicate(op.getKind());
+    if (!predicate)
+      return rewriter.notifyMatchFailure(op, "unsupported comparison kind");
+
+    rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
+        op, *predicate, adaptor.getLhs(), adaptor.getRhs());
+    return mlir::success();
+  }
+};
+
+struct ConvertCastOp : public mlir::OpConversionPattern<cir::CastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(cir::CastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    if (op.getKind() != cir::CastKind::float_to_bool)
+      return rewriter.notifyMatchFailure(op, "unsupported cast kind");
+    if (!isSupportedCIRFloatType(op.getSrc().getType()))
+      return rewriter.notifyMatchFailure(
+          op, "float-to-bool source type is unsupported");
+
+    mlir::Value source = adaptor.getSrc();
+    auto zero = rewriter.create<mlir::arith::ConstantOp>(
+        op.getLoc(), rewriter.getFloatAttr(source.getType(), 0.0));
+    rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
+        op, mlir::arith::CmpFPredicate::UNE, source, zero);
+    return mlir::success();
+  }
+};
+
 struct ConvertBranchOp : public mlir::OpConversionPattern<cir::BrOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -242,8 +305,8 @@ public:
 
     mlir::RewritePatternSet patterns(context);
     patterns.add<ConvertFuncOp, ConvertBinOp, ConvertConstantOp, ConvertUnaryOp,
-                 ConvertCallOp, ConvertBranchOp, ConvertCondBranchOp,
-                 ConvertReturnOp>(typeConverter, context);
+                 ConvertCallOp, ConvertCmpOp, ConvertCastOp, ConvertBranchOp,
+                 ConvertCondBranchOp, ConvertReturnOp>(typeConverter, context);
 
     if (mlir::failed(mlir::applyFullConversion(getOperation(), target,
                                                std::move(patterns))))
