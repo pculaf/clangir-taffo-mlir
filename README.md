@@ -45,6 +45,8 @@ cir.binop(add)   -> arith.addf
 cir.binop(sub)   -> arith.subf
 cir.binop(mul)   -> arith.mulf
 cir.binop(div)   -> arith.divf
+cir.cmp(fp)      -> arith.cmpf
+cir.cast(float_to_bool) -> arith.constant + arith.cmpf
 cir.br           -> cf.br
 cir.brcond       -> cf.cond_br
 cir.return       -> func.return
@@ -61,8 +63,10 @@ optimization, and lowering back to `arith`. Boolean-controlled branching with
 supported arithmetic in each branch has also been validated through the same
 pipeline. Branch successor operands and converted block arguments are
 supported, and Clang-generated value merges have been validated through
-conversion and MLIR's `--lift-cf-to-scf` pass. TAFFO-MLIR does not yet process
-the resulting value-producing control flow cleanly.
+conversion and MLIR's `--lift-cf-to-scf` pass. With the current TAFFO-MLIR
+pipeline, a merged floating value requires an explicit `set_range` annotation
+before it is used by further TAFFO arithmetic. Transparent range propagation
+through floating CFG merge arguments remains future work.
 
 ## Next Steps
 
