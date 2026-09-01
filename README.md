@@ -37,8 +37,10 @@ conversion infrastructure. The currently supported conversion is:
 !cir.float       -> f32
 !cir.double      -> f64
 !cir.bool        -> i1
+!cir.int         -> signless builtin integer of the same width
 cir.func         -> func.func
 cir.const(fp)    -> arith.constant
+cir.const(int)   -> arith.constant
 cir.unary(minus) -> arith.negf
 cir.call(direct) -> func.call
 cir.binop(add)   -> arith.addf
@@ -46,6 +48,7 @@ cir.binop(sub)   -> arith.subf
 cir.binop(mul)   -> arith.mulf
 cir.binop(div)   -> arith.divf
 cir.cmp(fp)      -> arith.cmpf
+cir.cmp(int)     -> arith.cmpi
 cir.cast(float_to_bool) -> arith.constant + arith.cmpf
 cir.br           -> cf.br
 cir.brcond       -> cf.cond_br
@@ -67,6 +70,11 @@ conversion and MLIR's `--lift-cf-to-scf` pass. With the current TAFFO-MLIR
 pipeline, a merged floating value requires an explicit `set_range` annotation
 before it is used by further TAFFO arithmetic. Transparent range propagation
 through floating CFG merge arguments remains future work.
+
+Signed and unsigned integer comparisons used as branch conditions are also
+supported. Integer control computations remain in standard `arith` and `cf`
+while supported floating arithmetic in each branch can pass through the TAFFO
+pipeline.
 
 ## Next Steps
 
