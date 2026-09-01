@@ -205,15 +205,40 @@ struct ConvertUnaryOp : public mlir::OpConversionPattern<cir::UnaryOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::UnaryOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!isSupportedCIRFloatType(op.getType()))
-      return rewriter.notifyMatchFailure(
-          op, "only floating unary operations are supported");
-    if (op.getKind() != cir::UnaryOpKind::Minus)
-      return rewriter.notifyMatchFailure(op,
-                                         "unsupported unary operation kind");
+    if (isSupportedCIRFloatType(op.getType())) {
+      if (op.getKind() != cir::UnaryOpKind::Minus)
+        return rewriter.notifyMatchFailure(
+            op, "unsupported floating unary operation kind");
 
-    rewriter.replaceOpWithNewOp<mlir::arith::NegFOp>(op, adaptor.getInput());
-    return mlir::success();
+      rewriter.replaceOpWithNewOp<mlir::arith::NegFOp>(op, adaptor.getInput());
+      return mlir::success();
+    }
+
+    if (mlir::isa<cir::IntType>(op.getType())) {
+      mlir::Value input = adaptor.getInput();
+      auto one = rewriter.create<mlir::arith::ConstantOp>(
+          op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
+      mlir::arith::IntegerOverflowFlags overflowFlags =
+          op.getNoSignedWrap() ? mlir::arith::IntegerOverflowFlags::nsw
+                               : mlir::arith::IntegerOverflowFlags::none;
+
+      switch (op.getKind()) {
+      case cir::UnaryOpKind::Inc:
+        rewriter.replaceOpWithNewOp<mlir::arith::AddIOp>(op, input, one,
+                                                         overflowFlags);
+        return mlir::success();
+      case cir::UnaryOpKind::Dec:
+        rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(op, input, one,
+                                                         overflowFlags);
+        return mlir::success();
+      default:
+        return rewriter.notifyMatchFailure(
+            op, "unsupported integer unary operation kind");
+      }
+    }
+
+    return rewriter.notifyMatchFailure(op,
+                                       "unary operation type is unsupported");
   }
 };
 
