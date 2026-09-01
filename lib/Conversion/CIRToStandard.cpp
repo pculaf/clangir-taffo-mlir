@@ -33,6 +33,9 @@ public:
     addConversion([context](cir::BoolType) -> mlir::Type {
       return mlir::IntegerType::get(context, 1);
     });
+    addConversion([context](cir::IntType type) -> mlir::Type {
+      return mlir::IntegerType::get(context, type.getWidth());
+    });
   }
 };
 
@@ -55,6 +58,29 @@ convertCIRFloatCmpPredicate(cir::CmpOpKind kind) {
     return mlir::arith::CmpFPredicate::OEQ;
   case cir::CmpOpKind::ne:
     return mlir::arith::CmpFPredicate::UNE;
+  }
+  return std::nullopt;
+}
+
+static std::optional<mlir::arith::CmpIPredicate>
+convertCIRIntCmpPredicate(cir::CmpOpKind kind, bool isSigned) {
+  switch (kind) {
+  case cir::CmpOpKind::lt:
+    return isSigned ? mlir::arith::CmpIPredicate::slt
+                    : mlir::arith::CmpIPredicate::ult;
+  case cir::CmpOpKind::le:
+    return isSigned ? mlir::arith::CmpIPredicate::sle
+                    : mlir::arith::CmpIPredicate::ule;
+  case cir::CmpOpKind::gt:
+    return isSigned ? mlir::arith::CmpIPredicate::sgt
+                    : mlir::arith::CmpIPredicate::ugt;
+  case cir::CmpOpKind::ge:
+    return isSigned ? mlir::arith::CmpIPredicate::sge
+                    : mlir::arith::CmpIPredicate::uge;
+  case cir::CmpOpKind::eq:
+    return mlir::arith::CmpIPredicate::eq;
+  case cir::CmpOpKind::ne:
+    return mlir::arith::CmpIPredicate::ne;
   }
   return std::nullopt;
 }
@@ -146,19 +172,30 @@ struct ConvertConstantOp : public mlir::OpConversionPattern<cir::ConstantOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::ConstantOp op, OpAdaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto value = mlir::dyn_cast<cir::FPAttr>(op.getValue());
-    if (!value)
-      return rewriter.notifyMatchFailure(
-          op, "only floating constants are supported");
-
     mlir::Type convertedType = getTypeConverter()->convertType(op.getType());
-    auto floatType = mlir::dyn_cast_or_null<mlir::FloatType>(convertedType);
-    if (!floatType)
-      return rewriter.notifyMatchFailure(op, "constant type is unsupported");
+    if (auto value = mlir::dyn_cast<cir::FPAttr>(op.getValue())) {
+      auto floatType = mlir::dyn_cast_or_null<mlir::FloatType>(convertedType);
+      if (!floatType)
+        return rewriter.notifyMatchFailure(op, "constant type is unsupported");
 
-    auto convertedValue = mlir::FloatAttr::get(floatType, value.getValue());
-    rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, convertedValue);
-    return mlir::success();
+      auto convertedValue = mlir::FloatAttr::get(floatType, value.getValue());
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, convertedValue);
+      return mlir::success();
+    }
+
+    if (auto value = mlir::dyn_cast<cir::IntAttr>(op.getValue())) {
+      auto integerType =
+          mlir::dyn_cast_or_null<mlir::IntegerType>(convertedType);
+      if (!integerType)
+        return rewriter.notifyMatchFailure(op, "constant type is unsupported");
+
+      auto convertedValue =
+          mlir::IntegerAttr::get(integerType, value.getValue());
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, convertedValue);
+      return mlir::success();
+    }
+
+    return rewriter.notifyMatchFailure(op, "constant value is unsupported");
   }
 };
 
@@ -215,18 +252,30 @@ struct ConvertCmpOp : public mlir::OpConversionPattern<cir::CmpOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::CmpOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!isSupportedCIRFloatType(op.getLhs().getType()))
-      return rewriter.notifyMatchFailure(
-          op, "only floating comparisons are supported");
+    mlir::Type operandType = op.getLhs().getType();
+    if (isSupportedCIRFloatType(operandType)) {
+      std::optional<mlir::arith::CmpFPredicate> predicate =
+          convertCIRFloatCmpPredicate(op.getKind());
+      if (!predicate)
+        return rewriter.notifyMatchFailure(op, "unsupported comparison kind");
 
-    std::optional<mlir::arith::CmpFPredicate> predicate =
-        convertCIRFloatCmpPredicate(op.getKind());
-    if (!predicate)
-      return rewriter.notifyMatchFailure(op, "unsupported comparison kind");
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
+          op, *predicate, adaptor.getLhs(), adaptor.getRhs());
+      return mlir::success();
+    }
 
-    rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
-        op, *predicate, adaptor.getLhs(), adaptor.getRhs());
-    return mlir::success();
+    if (auto integerType = mlir::dyn_cast<cir::IntType>(operandType)) {
+      std::optional<mlir::arith::CmpIPredicate> predicate =
+          convertCIRIntCmpPredicate(op.getKind(), integerType.isSigned());
+      if (!predicate)
+        return rewriter.notifyMatchFailure(op, "unsupported comparison kind");
+
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(
+          op, *predicate, adaptor.getLhs(), adaptor.getRhs());
+      return mlir::success();
+    }
+
+    return rewriter.notifyMatchFailure(op, "comparison type is unsupported");
   }
 };
 
