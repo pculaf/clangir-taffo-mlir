@@ -51,6 +51,7 @@ cir.binop(mul)   -> arith.mulf
 cir.binop(div)   -> arith.divf
 cir.cmp(fp)      -> arith.cmpf
 cir.cmp(int)     -> arith.cmpi
+cir.cast(int_to_float) -> arith.sitofp / arith.uitofp
 cir.cast(float_to_bool) -> arith.constant + arith.cmpf
 cir.br           -> cf.br
 cir.brcond       -> cf.cond_br
@@ -77,7 +78,8 @@ Signed and unsigned integer comparisons used as branch conditions are also
 supported. Integer control computations remain in standard `arith` and `cf`
 while supported floating arithmetic in each branch can pass through the TAFFO
 pipeline. Integer increment and decrement support also enables counted loops
-with integer induction variables.
+with integer induction variables. Signed and unsigned integer values can also
+be converted to `f32`, range-annotated, and used by supported TAFFO arithmetic.
 
 ## Next Steps
 
