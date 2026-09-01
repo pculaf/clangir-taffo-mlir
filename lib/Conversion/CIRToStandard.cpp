@@ -310,6 +310,28 @@ struct ConvertCastOp : public mlir::OpConversionPattern<cir::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::CastOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
+    if (op.getKind() == cir::CastKind::int_to_float) {
+      auto sourceType = mlir::dyn_cast<cir::IntType>(op.getSrc().getType());
+      if (!sourceType)
+        return rewriter.notifyMatchFailure(
+            op, "integer-to-float source type is unsupported");
+      if (!mlir::isa<cir::SingleType>(op.getType()))
+        return rewriter.notifyMatchFailure(
+            op, "only !cir.float integer conversion results are supported");
+
+      mlir::Type resultType = getTypeConverter()->convertType(op.getType());
+      if (!resultType)
+        return mlir::failure();
+
+      if (sourceType.isSigned())
+        rewriter.replaceOpWithNewOp<mlir::arith::SIToFPOp>(op, resultType,
+                                                           adaptor.getSrc());
+      else
+        rewriter.replaceOpWithNewOp<mlir::arith::UIToFPOp>(op, resultType,
+                                                           adaptor.getSrc());
+      return mlir::success();
+    }
+
     if (op.getKind() != cir::CastKind::float_to_bool)
       return rewriter.notifyMatchFailure(op, "unsupported cast kind");
     if (!isSupportedCIRFloatType(op.getSrc().getType()))
