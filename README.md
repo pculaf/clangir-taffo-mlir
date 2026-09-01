@@ -42,6 +42,8 @@ cir.func         -> func.func
 cir.const(fp)    -> arith.constant
 cir.const(int)   -> arith.constant
 cir.unary(minus) -> arith.negf
+cir.unary(inc)   -> arith.constant + arith.addi
+cir.unary(dec)   -> arith.constant + arith.subi
 cir.call(direct) -> func.call
 cir.binop(add)   -> arith.addf
 cir.binop(sub)   -> arith.subf
@@ -74,7 +76,8 @@ through floating CFG merge arguments remains future work.
 Signed and unsigned integer comparisons used as branch conditions are also
 supported. Integer control computations remain in standard `arith` and `cf`
 while supported floating arithmetic in each branch can pass through the TAFFO
-pipeline.
+pipeline. Integer increment and decrement support also enables counted loops
+with integer induction variables.
 
 ## Next Steps
 
