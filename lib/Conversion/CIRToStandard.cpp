@@ -374,6 +374,22 @@ struct ConvertCastOp : public mlir::OpConversionPattern<cir::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::CastOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
+    if (op.getKind() == cir::CastKind::int_to_bool) {
+      if (!mlir::isa<cir::IntType>(op.getSrc().getType()))
+        return rewriter.notifyMatchFailure(
+            op, "integer-to-bool source type is unsupported");
+      if (!mlir::isa<cir::BoolType>(op.getType()))
+        return rewriter.notifyMatchFailure(
+            op, "integer-to-bool result type is unsupported");
+
+      mlir::Value source = adaptor.getSrc();
+      auto zero = rewriter.create<mlir::arith::ConstantOp>(
+          op.getLoc(), rewriter.getIntegerAttr(source.getType(), 0));
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(
+          op, mlir::arith::CmpIPredicate::ne, source, zero);
+      return mlir::success();
+    }
+
     if (op.getKind() == cir::CastKind::int_to_float) {
       auto sourceType = mlir::dyn_cast<cir::IntType>(op.getSrc().getType());
       if (!sourceType)
