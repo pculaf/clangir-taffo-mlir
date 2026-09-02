@@ -41,16 +41,24 @@ conversion infrastructure. The currently supported conversion is:
 cir.func         -> func.func
 cir.const(fp)    -> arith.constant
 cir.const(int)   -> arith.constant
-cir.unary(minus) -> arith.negf
+cir.unary(minus, fp) -> arith.negf
 cir.unary(inc)   -> arith.constant + arith.addi
 cir.unary(dec)   -> arith.constant + arith.subi
+cir.unary(plus, int) -> converted operand
+cir.unary(minus, int) -> arith.constant + arith.subi
 cir.call(direct) -> func.call
-cir.binop(add)   -> arith.addf
-cir.binop(sub)   -> arith.subf
-cir.binop(mul)   -> arith.mulf
-cir.binop(div)   -> arith.divf
+cir.binop(add, fp) -> arith.addf
+cir.binop(sub, fp) -> arith.subf
+cir.binop(mul, fp) -> arith.mulf
+cir.binop(div, fp) -> arith.divf
+cir.binop(add, int) -> arith.addi
+cir.binop(sub, int) -> arith.subi
+cir.binop(mul, int) -> arith.muli
+cir.binop(div, int) -> arith.divsi / arith.divui
+cir.binop(rem, int) -> arith.remsi / arith.remui
 cir.cmp(fp)      -> arith.cmpf
 cir.cmp(int)     -> arith.cmpi
+cir.cast(int_to_bool) -> arith.constant + arith.cmpi
 cir.cast(int_to_float) -> arith.sitofp / arith.uitofp
 cir.cast(float_to_bool) -> arith.constant + arith.cmpf
 cir.br           -> cf.br
@@ -78,8 +86,14 @@ Signed and unsigned integer comparisons used as branch conditions are also
 supported. Integer control computations remain in standard `arith` and `cf`
 while supported floating arithmetic in each branch can pass through the TAFFO
 pipeline. Integer increment and decrement support also enables counted loops
-with integer induction variables. Signed and unsigned integer values can also
-be converted to `f32`, range-annotated, and used by supported TAFFO arithmetic.
+with integer induction variables. Integer addition, subtraction,
+multiplication, division, remainder, unary plus/minus, and conversion to a
+boolean condition are supported. CIR integer signedness and overflow semantics
+are preserved where they affect the selected `arith` operation. Computed
+integer conditions and strided integer loops have been validated from C source
+through the complete TAFFO pipeline. Signed and unsigned integer values can
+also be converted to `f32`, range-annotated, and used by supported TAFFO
+arithmetic.
 
 ## Next Steps
 
