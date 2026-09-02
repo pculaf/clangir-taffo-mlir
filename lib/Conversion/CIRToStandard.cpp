@@ -165,8 +165,8 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
 
     auto integerType = mlir::dyn_cast<cir::IntType>(operandType);
     if (!integerType)
-      return rewriter.notifyMatchFailure(op,
-                                         "binary operation type is unsupported");
+      return rewriter.notifyMatchFailure(
+          op, "binary operation type is unsupported");
     if (op.getSaturated())
       return rewriter.notifyMatchFailure(
           op, "saturated integer arithmetic is unsupported");
@@ -174,11 +174,9 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
     mlir::arith::IntegerOverflowFlags overflowFlags =
         mlir::arith::IntegerOverflowFlags::none;
     if (op.getNoSignedWrap())
-      overflowFlags =
-          overflowFlags | mlir::arith::IntegerOverflowFlags::nsw;
+      overflowFlags = overflowFlags | mlir::arith::IntegerOverflowFlags::nsw;
     if (op.getNoUnsignedWrap())
-      overflowFlags =
-          overflowFlags | mlir::arith::IntegerOverflowFlags::nuw;
+      overflowFlags = overflowFlags | mlir::arith::IntegerOverflowFlags::nuw;
 
     switch (op.getKind()) {
     case cir::BinOpKind::Add:
@@ -195,19 +193,19 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
       return mlir::success();
     case cir::BinOpKind::Div:
       if (integerType.isSigned())
-        rewriter.replaceOpWithNewOp<mlir::arith::DivSIOp>(
-            op, adaptor.getLhs(), adaptor.getRhs());
+        rewriter.replaceOpWithNewOp<mlir::arith::DivSIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
       else
-        rewriter.replaceOpWithNewOp<mlir::arith::DivUIOp>(
-            op, adaptor.getLhs(), adaptor.getRhs());
+        rewriter.replaceOpWithNewOp<mlir::arith::DivUIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
       return mlir::success();
     case cir::BinOpKind::Rem:
       if (integerType.isSigned())
-        rewriter.replaceOpWithNewOp<mlir::arith::RemSIOp>(
-            op, adaptor.getLhs(), adaptor.getRhs());
+        rewriter.replaceOpWithNewOp<mlir::arith::RemSIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
       else
-        rewriter.replaceOpWithNewOp<mlir::arith::RemUIOp>(
-            op, adaptor.getLhs(), adaptor.getRhs());
+        rewriter.replaceOpWithNewOp<mlir::arith::RemUIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
       return mlir::success();
     default:
       return rewriter.notifyMatchFailure(
