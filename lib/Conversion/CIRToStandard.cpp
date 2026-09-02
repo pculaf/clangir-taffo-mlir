@@ -266,21 +266,35 @@ struct ConvertUnaryOp : public mlir::OpConversionPattern<cir::UnaryOp> {
 
     if (mlir::isa<cir::IntType>(op.getType())) {
       mlir::Value input = adaptor.getInput();
-      auto one = rewriter.create<mlir::arith::ConstantOp>(
-          op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
       mlir::arith::IntegerOverflowFlags overflowFlags =
           op.getNoSignedWrap() ? mlir::arith::IntegerOverflowFlags::nsw
                                : mlir::arith::IntegerOverflowFlags::none;
 
       switch (op.getKind()) {
-      case cir::UnaryOpKind::Inc:
+      case cir::UnaryOpKind::Inc: {
+        auto one = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
         rewriter.replaceOpWithNewOp<mlir::arith::AddIOp>(op, input, one,
                                                          overflowFlags);
         return mlir::success();
-      case cir::UnaryOpKind::Dec:
+      }
+      case cir::UnaryOpKind::Dec: {
+        auto one = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
         rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(op, input, one,
                                                          overflowFlags);
         return mlir::success();
+      }
+      case cir::UnaryOpKind::Plus:
+        rewriter.replaceOp(op, input);
+        return mlir::success();
+      case cir::UnaryOpKind::Minus: {
+        auto zero = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 0));
+        rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(op, zero, input,
+                                                         overflowFlags);
+        return mlir::success();
+      }
       default:
         return rewriter.notifyMatchFailure(
             op, "unsupported integer unary operation kind");
