@@ -137,32 +137,80 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::BinOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (!mlir::isa<cir::SingleType>(op.getLhs().getType()))
-      return rewriter.notifyMatchFailure(op, "only !cir.float is supported");
+    mlir::Type operandType = op.getLhs().getType();
+    if (mlir::isa<cir::SingleType>(operandType)) {
+      switch (op.getKind()) {
+      case cir::BinOpKind::Add:
+        rewriter.replaceOpWithNewOp<mlir::arith::AddFOp>(op, adaptor.getLhs(),
+                                                         adaptor.getRhs());
+        break;
+      case cir::BinOpKind::Sub:
+        rewriter.replaceOpWithNewOp<mlir::arith::SubFOp>(op, adaptor.getLhs(),
+                                                         adaptor.getRhs());
+        break;
+      case cir::BinOpKind::Mul:
+        rewriter.replaceOpWithNewOp<mlir::arith::MulFOp>(op, adaptor.getLhs(),
+                                                         adaptor.getRhs());
+        break;
+      case cir::BinOpKind::Div:
+        rewriter.replaceOpWithNewOp<mlir::arith::DivFOp>(op, adaptor.getLhs(),
+                                                         adaptor.getRhs());
+        break;
+      default:
+        return rewriter.notifyMatchFailure(
+            op, "unsupported floating binary operation kind");
+      }
+      return mlir::success();
+    }
+
+    auto integerType = mlir::dyn_cast<cir::IntType>(operandType);
+    if (!integerType)
+      return rewriter.notifyMatchFailure(
+          op, "binary operation type is unsupported");
+    if (op.getSaturated())
+      return rewriter.notifyMatchFailure(
+          op, "saturated integer arithmetic is unsupported");
+
+    mlir::arith::IntegerOverflowFlags overflowFlags =
+        mlir::arith::IntegerOverflowFlags::none;
+    if (op.getNoSignedWrap())
+      overflowFlags = overflowFlags | mlir::arith::IntegerOverflowFlags::nsw;
+    if (op.getNoUnsignedWrap())
+      overflowFlags = overflowFlags | mlir::arith::IntegerOverflowFlags::nuw;
 
     switch (op.getKind()) {
     case cir::BinOpKind::Add:
-      rewriter.replaceOpWithNewOp<mlir::arith::AddFOp>(op, adaptor.getLhs(),
-                                                       adaptor.getRhs());
-      break;
+      rewriter.replaceOpWithNewOp<mlir::arith::AddIOp>(
+          op, adaptor.getLhs(), adaptor.getRhs(), overflowFlags);
+      return mlir::success();
     case cir::BinOpKind::Sub:
-      rewriter.replaceOpWithNewOp<mlir::arith::SubFOp>(op, adaptor.getLhs(),
-                                                       adaptor.getRhs());
-      break;
+      rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(
+          op, adaptor.getLhs(), adaptor.getRhs(), overflowFlags);
+      return mlir::success();
     case cir::BinOpKind::Mul:
-      rewriter.replaceOpWithNewOp<mlir::arith::MulFOp>(op, adaptor.getLhs(),
-                                                       adaptor.getRhs());
-      break;
+      rewriter.replaceOpWithNewOp<mlir::arith::MulIOp>(
+          op, adaptor.getLhs(), adaptor.getRhs(), overflowFlags);
+      return mlir::success();
     case cir::BinOpKind::Div:
-      rewriter.replaceOpWithNewOp<mlir::arith::DivFOp>(op, adaptor.getLhs(),
-                                                       adaptor.getRhs());
-      break;
+      if (integerType.isSigned())
+        rewriter.replaceOpWithNewOp<mlir::arith::DivSIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
+      else
+        rewriter.replaceOpWithNewOp<mlir::arith::DivUIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
+      return mlir::success();
+    case cir::BinOpKind::Rem:
+      if (integerType.isSigned())
+        rewriter.replaceOpWithNewOp<mlir::arith::RemSIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
+      else
+        rewriter.replaceOpWithNewOp<mlir::arith::RemUIOp>(op, adaptor.getLhs(),
+                                                          adaptor.getRhs());
+      return mlir::success();
     default:
-      return rewriter.notifyMatchFailure(op,
-                                         "unsupported binary operation kind");
+      return rewriter.notifyMatchFailure(
+          op, "unsupported integer binary operation kind");
     }
-
-    return mlir::success();
   }
 };
 
@@ -216,21 +264,35 @@ struct ConvertUnaryOp : public mlir::OpConversionPattern<cir::UnaryOp> {
 
     if (mlir::isa<cir::IntType>(op.getType())) {
       mlir::Value input = adaptor.getInput();
-      auto one = rewriter.create<mlir::arith::ConstantOp>(
-          op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
       mlir::arith::IntegerOverflowFlags overflowFlags =
           op.getNoSignedWrap() ? mlir::arith::IntegerOverflowFlags::nsw
                                : mlir::arith::IntegerOverflowFlags::none;
 
       switch (op.getKind()) {
-      case cir::UnaryOpKind::Inc:
+      case cir::UnaryOpKind::Inc: {
+        auto one = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
         rewriter.replaceOpWithNewOp<mlir::arith::AddIOp>(op, input, one,
                                                          overflowFlags);
         return mlir::success();
-      case cir::UnaryOpKind::Dec:
+      }
+      case cir::UnaryOpKind::Dec: {
+        auto one = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 1));
         rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(op, input, one,
                                                          overflowFlags);
         return mlir::success();
+      }
+      case cir::UnaryOpKind::Plus:
+        rewriter.replaceOp(op, input);
+        return mlir::success();
+      case cir::UnaryOpKind::Minus: {
+        auto zero = rewriter.create<mlir::arith::ConstantOp>(
+            op.getLoc(), rewriter.getIntegerAttr(input.getType(), 0));
+        rewriter.replaceOpWithNewOp<mlir::arith::SubIOp>(op, zero, input,
+                                                         overflowFlags);
+        return mlir::success();
+      }
       default:
         return rewriter.notifyMatchFailure(
             op, "unsupported integer unary operation kind");
@@ -310,6 +372,22 @@ struct ConvertCastOp : public mlir::OpConversionPattern<cir::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(cir::CastOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
+    if (op.getKind() == cir::CastKind::int_to_bool) {
+      if (!mlir::isa<cir::IntType>(op.getSrc().getType()))
+        return rewriter.notifyMatchFailure(
+            op, "integer-to-bool source type is unsupported");
+      if (!mlir::isa<cir::BoolType>(op.getType()))
+        return rewriter.notifyMatchFailure(
+            op, "integer-to-bool result type is unsupported");
+
+      mlir::Value source = adaptor.getSrc();
+      auto zero = rewriter.create<mlir::arith::ConstantOp>(
+          op.getLoc(), rewriter.getIntegerAttr(source.getType(), 0));
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(
+          op, mlir::arith::CmpIPredicate::ne, source, zero);
+      return mlir::success();
+    }
+
     if (op.getKind() == cir::CastKind::int_to_float) {
       auto sourceType = mlir::dyn_cast<cir::IntType>(op.getSrc().getType());
       if (!sourceType)
