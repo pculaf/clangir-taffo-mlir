@@ -163,7 +163,8 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
       return mlir::success();
     }
 
-    if (!mlir::isa<cir::IntType>(operandType))
+    auto integerType = mlir::dyn_cast<cir::IntType>(operandType);
+    if (!integerType)
       return rewriter.notifyMatchFailure(op,
                                          "binary operation type is unsupported");
     if (op.getSaturated())
@@ -191,6 +192,22 @@ struct ConvertBinOp : public mlir::OpConversionPattern<cir::BinOp> {
     case cir::BinOpKind::Mul:
       rewriter.replaceOpWithNewOp<mlir::arith::MulIOp>(
           op, adaptor.getLhs(), adaptor.getRhs(), overflowFlags);
+      return mlir::success();
+    case cir::BinOpKind::Div:
+      if (integerType.isSigned())
+        rewriter.replaceOpWithNewOp<mlir::arith::DivSIOp>(
+            op, adaptor.getLhs(), adaptor.getRhs());
+      else
+        rewriter.replaceOpWithNewOp<mlir::arith::DivUIOp>(
+            op, adaptor.getLhs(), adaptor.getRhs());
+      return mlir::success();
+    case cir::BinOpKind::Rem:
+      if (integerType.isSigned())
+        rewriter.replaceOpWithNewOp<mlir::arith::RemSIOp>(
+            op, adaptor.getLhs(), adaptor.getRhs());
+      else
+        rewriter.replaceOpWithNewOp<mlir::arith::RemUIOp>(
+            op, adaptor.getLhs(), adaptor.getRhs());
       return mlir::success();
     default:
       return rewriter.notifyMatchFailure(
