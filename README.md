@@ -95,6 +95,12 @@ through the complete TAFFO pipeline. Signed and unsigned integer values can
 also be converted to `f32`, range-annotated, and used by supported TAFFO
 arithmetic.
 
+The tool also provides `--convert-lifted-cf-loops-to-scf-for` for the supported
+counted-loop subset. It normalizes the `scf.while` structure produced by CFG
+lifting and uses MLIR's existing while-to-for conversion to produce `scf.for`.
+A fixed-trip C loop with a floating-point accumulator has been validated
+through this frontend path.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to

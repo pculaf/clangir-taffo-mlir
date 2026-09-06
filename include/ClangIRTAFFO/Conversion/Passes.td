@@ -14,4 +14,14 @@ def ConvertCIRToStandardPass
   ];
 }
 
+def ConvertLiftedCFLoopsToSCFForPass
+    : Pass<"convert-lifted-cf-loops-to-scf-for", "mlir::ModuleOp"> {
+  let summary = "Convert supported lifted CFG loops to scf.for";
+
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::scf::SCFDialect"
+  ];
+}
+
 #endif // CLANGIR_TAFFO_CONVERSION_PASSES_TD
