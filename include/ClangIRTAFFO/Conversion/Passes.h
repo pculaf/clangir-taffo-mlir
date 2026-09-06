@@ -5,6 +5,7 @@
 
 namespace clangir_taffo {
 #define GEN_PASS_DECL_CONVERTCIRTOSTANDARDPASS
+#define GEN_PASS_DECL_CONVERTLIFTEDCFLOOPSTOSCFFORPASS
 #include "ClangIRTAFFO/Conversion/Passes.h.inc"
 
 #define GEN_PASS_REGISTRATION

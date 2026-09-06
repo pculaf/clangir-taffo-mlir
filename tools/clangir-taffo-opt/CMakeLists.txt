@@ -6,6 +6,8 @@ set(LIBS
   MLIRFuncDialect
   MLIRIR
   MLIROptLib
+  MLIRSCFDialect
+  MLIRUBDialect
 )
 
 add_llvm_executable(clangir-taffo-opt

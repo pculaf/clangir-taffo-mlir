@@ -1,5 +1,6 @@
 add_mlir_library(ClangIRTAFFOConversion
   CIRToStandard.cpp
+  LiftedCFToSCF.cpp
 
   DEPENDS
   ClangIRTAFFOConversionPassIncGen
@@ -11,5 +12,7 @@ add_mlir_library(ClangIRTAFFOConversion
   MLIRFuncDialect
   MLIRIR
   MLIRPass
+  MLIRSCFDialect
+  MLIRSCFTransforms
   MLIRTransforms
 )
