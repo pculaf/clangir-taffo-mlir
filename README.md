@@ -118,6 +118,11 @@ and runtime bounds, including an initially false condition. This does not
 establish general condition-driven `while` support through TAFFO; the existing
 trip-count limitation also applies to runtime-bound counting `while` loops.
 
+A condition-driven loop with `while (n > 1)` and `n /= 2` lowers to
+`scf.while`, with frontend execution tests covering zero and multiple
+iterations. This example does not yet complete the local TAFFO pipeline:
+loop-carried floating values retain unresolved conversion casts.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to
