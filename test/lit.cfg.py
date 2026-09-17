@@ -12,6 +12,7 @@ config.test_exec_root = os.path.join(config.clangir_taffo_obj_root, "test")
 llvm_config.use_default_substitutions()
 
 config.excludes = [
+    "Inputs",
     "CMakeLists.txt",
     "lit.cfg.py",
     "lit.site.cfg.py",
@@ -19,5 +20,5 @@ config.excludes = [
 
 tool_dirs = [config.clangir_taffo_tools_dir, config.llvm_tools_dir]
 llvm_config.add_tool_substitutions(
-    ["cir-opt", "clang", "clangir-taffo-opt", "mlir-opt", "not"], tool_dirs
+    ["cir-opt", "clang", "clangir-taffo-opt", "mlir-opt", "mlir-translate", "not"], tool_dirs
 )
