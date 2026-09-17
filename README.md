@@ -107,6 +107,11 @@ for negative, zero, and positive bounds. TAFFO's current range analysis uses
 a default trip-count estimate of 100 when the bound is unknown; completing
 that pipeline does not establish valid accumulator ranges for arbitrary `n`.
 
+Nonzero starts and positive non-unit steps are also covered by
+`for (int i = 2; i < n; i += 3)`. Execution tests cover zero iterations and
+bounds between successive steps. The fixed-bound variant with `i < 10`
+completes the local TAFFO pipeline and executes three iterations.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to
