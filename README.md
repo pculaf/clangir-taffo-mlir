@@ -123,6 +123,14 @@ A condition-driven loop with `while (n > 1)` and `n /= 2` lowers to
 iterations. This example does not yet complete the local TAFFO pipeline:
 loop-carried floating values retain unresolved conversion casts.
 
+A tested nested `for` loop lowers correctly through the frontend, but TAFFO's
+interval analysis underestimates its shared accumulator range and produces
+an incorrect result, so end-to-end nested-loop support is not yet established.
+
+Frontend tests also cover an `if` inside a counted loop; the local TAFFO
+interval-analysis check for this example times out, so its end-to-end
+integration remains unverified.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to
