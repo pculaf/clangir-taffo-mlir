@@ -112,6 +112,17 @@ Nonzero starts and positive non-unit steps are also covered by
 bounds between successive steps. The fixed-bound variant with `i < 10`
 completes the local TAFFO pipeline and executes three iterations.
 
+Counting `while` loops with `i = 0`, an `i < n` condition, and `++i` in
+the body also lower through the same pipeline to `scf.for`. Tests cover fixed
+and runtime bounds, including an initially false condition. This does not
+establish general condition-driven `while` support through TAFFO; the existing
+trip-count limitation also applies to runtime-bound counting `while` loops.
+
+A condition-driven loop with `while (n > 1)` and `n /= 2` lowers to
+`scf.while`, with frontend execution tests covering zero and multiple
+iterations. This example does not yet complete the local TAFFO pipeline:
+loop-carried floating values retain unresolved conversion casts.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to
