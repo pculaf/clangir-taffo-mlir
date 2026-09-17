@@ -101,6 +101,17 @@ lifting and uses MLIR's existing while-to-for conversion to produce `scf.for`.
 A fixed-trip C loop with a floating-point accumulator has been validated
 through this frontend path.
 
+Counted loops with a runtime upper bound (`for (int i = 0; i < n; ++i)`)
+also lower to `scf.for`. Execution tests compare the frontend output with C
+for negative, zero, and positive bounds. TAFFO's current range analysis uses
+a default trip-count estimate of 100 when the bound is unknown; completing
+that pipeline does not establish valid accumulator ranges for arbitrary `n`.
+
+Nonzero starts and positive non-unit steps are also covered by
+`for (int i = 2; i < n; i += 3)`. Execution tests cover zero iterations and
+bounds between successive steps. The fixed-bound variant with `i < 10`
+completes the local TAFFO pipeline and executes three iterations.
+
 ## Next Steps
 
 The next step is to expand the supported CIR subset while continuing to
