@@ -1,145 +1,40 @@
-# TAFFO-MLIR / ClangIR Integration
+# ClangIR / TAFFO-MLIR Integration
 
-This project develops an integration path between a ClangIR-based C/C++
-frontend and TAFFO-MLIR.
+A course project for **Code Transformation and Optimization**, developing a
+C frontend for TAFFO-MLIR using ClangIR.
 
-The current work focuses on lowering a supported CIR subset to standard MLIR
-dialects that can be consumed by the TAFFO-MLIR pipeline.
+The project lowers a subset of ClangIR's CIR dialect to standard MLIR dialects
+for integration with the TAFFO-MLIR pipeline.
 
-## Current Status
+[Project presentation (PDF)](docs/presentation.pdf)
 
-TAFFO-MLIR has been built successfully against its pinned LLVM/MLIR snapshot,
-with ClangIR/CIR support enabled. A separate top-of-tree LLVM build was also
-used to check the current upstream ClangIR state.
+## Scope
 
-At the current checked LLVM revisions, ClangIR can emit CIR and lower CIR to
-LLVM-level representations. Lowering CIR to high-level MLIR dialects such as
-`func`, `arith`, `scf`, `cf`, and `memref` does not appear to be available as an
-exposed tool path in the tested tools.
+The standalone `clangir-taffo-opt` tool provides conversions for:
 
-The incubator `llvm/clangir` repository appears to contain through-MLIR lowering
-infrastructure, but that path does not appear to be available in the official
-top-of-tree LLVM build checked here.
+- **Arithmetic:** floating-point arithmetic, integer control expressions,
+  comparisons, and selected numeric conversions.
+- **Functions and control flow:** function definitions, direct calls, returns,
+  and branches, including calls used to specify value ranges for TAFFO.
+- **Counted loops:** normalization of lifted control flow to `scf.for`, reusing
+  MLIR's existing loop conversion. Tests cover fixed and runtime bounds,
+  positive strides, counting `while` loops, nesting, and conditional bodies.
 
-The currently exposed ClangIR path is:
+## Project Structure
 
-```text
-C/C++ -> CIR
-CIR -> LLVM dialect MLIR
-CIR -> LLVM IR
-```
-
-This repository now provides the standalone `clangir-taffo-opt` tool and an
-initial `--convert-cir-to-standard` pass implemented with MLIR's dialect
-conversion infrastructure. The currently supported conversion is:
-
-```text
-!cir.float       -> f32
-!cir.double      -> f64
-!cir.bool        -> i1
-!cir.int         -> signless builtin integer of the same width
-cir.func         -> func.func
-cir.const(fp)    -> arith.constant
-cir.const(int)   -> arith.constant
-cir.unary(minus, fp) -> arith.negf
-cir.unary(inc)   -> arith.constant + arith.addi
-cir.unary(dec)   -> arith.constant + arith.subi
-cir.unary(plus, int) -> converted operand
-cir.unary(minus, int) -> arith.constant + arith.subi
-cir.call(direct) -> func.call
-cir.binop(add, fp) -> arith.addf
-cir.binop(sub, fp) -> arith.subf
-cir.binop(mul, fp) -> arith.mulf
-cir.binop(div, fp) -> arith.divf
-cir.binop(add, int) -> arith.addi
-cir.binop(sub, int) -> arith.subi
-cir.binop(mul, int) -> arith.muli
-cir.binop(div, int) -> arith.divsi / arith.divui
-cir.binop(rem, int) -> arith.remsi / arith.remui
-cir.cmp(fp)      -> arith.cmpf
-cir.cmp(int)     -> arith.cmpi
-cir.cast(int_to_bool) -> arith.constant + arith.cmpi
-cir.cast(int_to_float) -> arith.sitofp / arith.uitofp
-cir.cast(float_to_bool) -> arith.constant + arith.cmpf
-cir.br           -> cf.br
-cir.brcond       -> cf.cond_br
-cir.return       -> func.return
-```
-
-The initial pass converts complete floating-point functions using addition,
-subtraction, multiplication, and division without leaving CIR operations in
-the output. Unsupported CIR operations cause the conversion to fail. The tool
-setup and conversions are covered by `lit` and `FileCheck` regression tests.
-All four arithmetic paths have also been validated from C source through Clang
-CIR generation and `mem2reg`. Range-annotated addition, multiplication, and
-division have been validated through CIR conversion, TAFFO-MLIR raising and
-optimization, and lowering back to `arith`. Boolean-controlled branching with
-supported arithmetic in each branch has also been validated through the same
-pipeline. Branch successor operands and converted block arguments are
-supported, and Clang-generated value merges have been validated through
-conversion and MLIR's `--lift-cf-to-scf` pass. With the current TAFFO-MLIR
-pipeline, a merged floating value requires an explicit `set_range` annotation
-before it is used by further TAFFO arithmetic. Transparent range propagation
-through floating CFG merge arguments remains future work.
-
-Signed and unsigned integer comparisons used as branch conditions are also
-supported. Integer control computations remain in standard `arith` and `cf`
-while supported floating arithmetic in each branch can pass through the TAFFO
-pipeline. Integer increment and decrement support also enables counted loops
-with integer induction variables. Integer addition, subtraction,
-multiplication, division, remainder, unary plus/minus, and conversion to a
-boolean condition are supported. CIR integer signedness and overflow semantics
-are preserved where they affect the selected `arith` operation. Computed
-integer conditions and strided integer loops have been validated from C source
-through the complete TAFFO pipeline. Signed and unsigned integer values can
-also be converted to `f32`, range-annotated, and used by supported TAFFO
-arithmetic.
-
-The tool also provides `--convert-lifted-cf-loops-to-scf-for` for the supported
-counted-loop subset. It normalizes the `scf.while` structure produced by CFG
-lifting and uses MLIR's existing while-to-for conversion to produce `scf.for`.
-A fixed-trip C loop with a floating-point accumulator has been validated
-through this frontend path.
-
-Counted loops with a runtime upper bound (`for (int i = 0; i < n; ++i)`)
-also lower to `scf.for`. Execution tests compare the frontend output with C
-for negative, zero, and positive bounds. TAFFO's current range analysis uses
-a default trip-count estimate of 100 when the bound is unknown; completing
-that pipeline does not establish valid accumulator ranges for arbitrary `n`.
-
-Nonzero starts and positive non-unit steps are also covered by
-`for (int i = 2; i < n; i += 3)`. Execution tests cover zero iterations and
-bounds between successive steps. The fixed-bound variant with `i < 10`
-completes the local TAFFO pipeline and executes three iterations.
-
-Counting `while` loops with `i = 0`, an `i < n` condition, and `++i` in
-the body also lower through the same pipeline to `scf.for`. Tests cover fixed
-and runtime bounds, including an initially false condition. This does not
-establish general condition-driven `while` support through TAFFO; the existing
-trip-count limitation also applies to runtime-bound counting `while` loops.
-
-A condition-driven loop with `while (n > 1)` and `n /= 2` lowers to
-`scf.while`, with frontend execution tests covering zero and multiple
-iterations. This example does not yet complete the local TAFFO pipeline:
-loop-carried floating values retain unresolved conversion casts.
-
-A tested nested `for` loop lowers correctly through the frontend, but TAFFO's
-interval analysis underestimates its shared accumulator range and produces
-an incorrect result, so end-to-end nested-loop support is not yet established.
-
-Frontend tests also cover an `if` inside a counted loop; the local TAFFO
-interval-analysis check for this example times out, so its end-to-end
-integration remains unverified.
-
-## Next Steps
-
-The next step is to expand the supported CIR subset while continuing to
-validate it through the TAFFO-MLIR pipeline.
+- [include/ClangIRTAFFO](include/ClangIRTAFFO): Pass declarations and definitions.
+- [lib/Conversion](lib/Conversion): Conversion pass implementations.
+- [tools/clangir-taffo-opt](tools/clangir-taffo-opt): Command-line tool.
+- [test](test): MLIR regression tests and C examples.
+- [llvm-taffo-pinned](llvm-taffo-pinned): LLVM revision and build configuration
+  used for development.
+- [llvm-top-of-tree](llvm-top-of-tree): LLVM revision and configuration from
+  upstream investigation.
 
 ## Building
 
-The project is configured as a standalone MLIR project and requires an
-LLVM/MLIR/Clang installation that includes CIR headers and libraries.
+Requires CMake, Ninja, and an LLVM/MLIR/Clang installation with CIR enabled.
+Use the revision and configuration in [llvm-taffo-pinned](llvm-taffo-pinned).
 
 ```sh
 cmake -G Ninja -S . -B build \
@@ -148,25 +43,31 @@ cmake -G Ninja -S . -B build \
 cmake --build build --target clangir-taffo-opt
 ```
 
-Run the regression tests with:
+## Usage
+
+Run from the repository root, with the LLVM installation's tools on `PATH`:
+
+```sh
+export PATH="<llvm-install-prefix>/bin:$PATH"
+
+clang -fclangir -emit-cir test/Integration/add.c -o /tmp/add.cir
+cir-opt --cir-flatten-cfg --mem2reg /tmp/add.cir \
+  | build/bin/clangir-taffo-opt --convert-cir-to-standard \
+  | mlir-opt --canonicalize -o /tmp/add.mlir
+```
+
+For counted loops, apply the loop conversion to the standard MLIR output:
+
+```sh
+mlir-opt input.mlir --canonicalize --lift-cf-to-scf --canonicalize \
+  | build/bin/clangir-taffo-opt --convert-lifted-cf-loops-to-scf-for \
+      -o output.mlir
+```
+
+Additional C examples are in [test/Integration](test/Integration).
+
+## Tests
 
 ```sh
 cmake --build build --target check-clangir-taffo
 ```
-
-## Build References
-
-The raw LLVM version and CMake configuration files are kept separately so they
-can be referenced from this README or reused in future build instructions.
-
-TAFFO-pinned LLVM:
-
-- `llvm-taffo-pinned/llvm_commit.txt`
-- `llvm-taffo-pinned/llvm_compile_flags.txt`
-- `llvm-taffo-pinned/llvm_version.txt`
-
-Top-of-tree LLVM:
-
-- `llvm-top-of-tree/llvm_commit.txt`
-- `llvm-top-of-tree/llvm_compile_flags.txt`
-- `llvm-top-of-tree/llvm_version.txt`
